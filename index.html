@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="cache-control" content="max-age=0" />
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="expires" content="0" />
+<meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT" />
+<meta http-equiv="pragma" content="no-cache" />
+<title>Snake Pro</title>
+<script>
+const DIRECTION_TOP = 1;
+const DIRECTION_RIGHT = 2;
+const DIRECTION_BOTTOM = 3;
+const DIRECTION_LEFT = 4;
+
+const CELL_SIZE = 20;
+const ROWS = 600/CELL_SIZE;
+const COLS = 600/CELL_SIZE;
+
+const STATE_READY = 0;
+const STATE_PLAYING = 1;
+const STATE_PAUSED = 2;
+const STATE_END = 3;
+
+window.gHighScore = 0;
+
+function reset()
+{
+	window.gState = STATE_READY;
+
+	window.gDirection = DIRECTION_RIGHT;
+	window.gNextDirection = DIRECTION_RIGHT;
+
+	window.gBody = [{X: 3, Y:3}, {X: 3, Y:4}, {X: 4, Y:4}];
+
+	window.gFoodPos = generateFoodPos();
+	
+	window.gScore = 0;
+	window.gSpeed = 100;
+	
+	render();
+}
+
+function GE(id)
+{
+	return document.getElementById(id);
+}
+
+function CE(cls, x, y)
+{
+	let segment = document.createElement("div");
+	segment.classList.add(cls);
+	segment.style = "top: " + (y*CELL_SIZE) + "px; left: " + x*CELL_SIZE + "px";
+	
+	return segment;
+}
+
+function gHead()
+{
+	return window.gBody[window.gBody.length-1];
+}
+
+function main()
+{
+	reset();
+
+	document.body.addEventListener('keydown', checkKey);
+
+	render();
+}
+
+function checkKey(e) {
+
+	e = e || window.event;
+
+	if (e.keyCode == '38') {
+		// up arrow
+		changeDirection(DIRECTION_TOP);
+	}
+	else if (e.keyCode == '40') {
+		// down arrow
+		changeDirection(DIRECTION_BOTTOM);
+	}
+	else if (e.keyCode == '37') {
+	   // left arrow
+		changeDirection(DIRECTION_LEFT);
+	}
+	else if (e.keyCode == '39') {
+	   // right arrow
+		changeDirection(DIRECTION_RIGHT);
+	}
+	else if (e.keyCode == '32') {
+	   // space
+	   
+		spaced();
+	}
+}
+
+function createEyes()
+{
+	let eye = document.createElement('div');
+
+	let leftEyeWhite = document.createElement('div');
+	leftEyeWhite.classList.add('ewl');
+	
+	let leftEyeBlack = document.createElement('div');
+	leftEyeBlack.classList.add('eblk');
+	
+	leftEyeWhite.appendChild(leftEyeBlack);
+	eye.appendChild(leftEyeWhite);
+
+	let rightEyeWhite = document.createElement('div');
+	rightEyeWhite.classList.add('ewr');
+	
+	let rightEyeBlack = document.createElement('div');
+	rightEyeBlack.classList.add('eblk');
+	
+	rightEyeWhite.appendChild(rightEyeBlack);
+	eye.appendChild(rightEyeWhite);
+	
+	return eye;
+}
+
+function render()
+{
+	let snakeCanvas = GE("snake-canvas");
+	
+	snakeCanvas.innerHTML = '';
+
+	for(let i = 0; i < gBody.length; i++)
+	{
+		let segment = CE("segment", gBody[i].X, gBody[i].Y);
+		
+		segment.classList.add("blue");
+		if(i == 0) // tail
+		{
+			if(gBody[i].X == gBody[i+1].X)
+			{
+				if(gBody[i].Y > gBody[i+1].Y)
+				{
+					segment.classList.add("ct");
+				}else{
+					segment.classList.add("cb");
+				}
+			}else if(gBody[i].X > gBody[i+1].X)
+			{
+					segment.classList.add("cl");
+			}else{
+				segment.classList.add("cr");
+			}
+		}
+		else if(i == gBody.length - 1) // head
+		{
+			let eyes = createEyes();
+			segment.appendChild(eyes);
+			if(gBody[i].X == gBody[i-1].X)
+			{
+				if(gBody[i].Y > gBody[i-1].Y)
+				{
+					segment.classList.add("hb");
+					eyes.classList.add('eb');
+				}else{
+					segment.classList.add("ht");
+					eyes.classList.add('et');
+				}
+			}else if(gBody[i].X > gBody[i-1].X)
+			{
+					segment.classList.add("hr");
+					eyes.classList.add('er');
+			}else{
+				segment.classList.add("hl");
+					eyes.classList.add('el');
+			}
+		}
+		else
+		{
+			if(gBody[i].X == gBody[i+1].X && gBody[i].X == gBody[i-1].X)
+			{
+				segment.classList.add("cv");
+			}else if(gBody[i].Y == gBody[i+1].Y && gBody[i].Y == gBody[i-1].Y)
+			{
+				segment.classList.add("ch");
+			}
+			
+			else if(gBody[i].X < gBody[i+1].X && gBody[i].Y < gBody[i-1].Y || gBody[i].Y < gBody[i+1].Y && gBody[i].X < gBody[i-1].X)
+			{
+				segment.classList.add("cbr");
+			}
+			else if(gBody[i].Y < gBody[i+1].Y && gBody[i].X > gBody[i-1].X || gBody[i].X > gBody[i+1].X && gBody[i].Y < gBody[i-1].Y)
+			{
+				segment.classList.add("cbl");
+			}
+			else if(gBody[i].X > gBody[i+1].X && gBody[i].Y > gBody[i-1].Y || gBody[i].Y > gBody[i+1].Y && gBody[i].X > gBody[i-1].X)
+			{
+				segment.classList.add("ctl");
+			}
+			else if(gBody[i].Y > gBody[i+1].Y && gBody[i].X < gBody[i-1].X || gBody[i].X < gBody[i+1].X && gBody[i].Y > gBody[i-1].Y)
+			{
+				segment.classList.add("ctr");
+			}
+			
+		}
+		snakeCanvas.appendChild(segment);
+	}
+	
+	
+	let food = GE("food");
+	food.style = "top: " + (gFoodPos.Y*CELL_SIZE) + "px; left: " + gFoodPos.X*CELL_SIZE + "px";
+	
+	let scorebox = GE('scorebox');
+	scorebox.innerHTML = '' + gScore;
+
+	let highscorebox = GE('highscorebox');
+	highscorebox.innerHTML = 'Highscore: ' + gHighScore;
+
+	let speedbox = GE('speedbox');
+	speedbox.innerHTML = 'Speed: ' + (150 - gSpeed);
+}
+
+function spaced()
+{
+	if(gState == STATE_READY || gState == STATE_PAUSED)
+	{
+		start();
+	}
+	else if(gState == STATE_PLAYING)
+	{
+		pause();
+	}
+	else if(gState == STATE_END)
+	{
+		reset();
+	}
+}
+
+function endGame()
+{
+	gState = STATE_END;
+	gHighScore = Math.max(gScore, gHighScore);
+	render();
+}
+
+function pause()
+{
+	gState = STATE_PAUSED;
+}
+
+function start()
+{
+	gState = STATE_PLAYING;
+	setTimeout(move, 100);
+}
+
+function move()
+{
+	let oldHead = gHead();
+	let newHead = null;
+
+	gDirection = gNextDirection;
+
+	if(gDirection == DIRECTION_TOP)
+	{
+		newHead = {X: oldHead.X, Y:oldHead.Y-1};
+	}
+
+	if(gDirection == DIRECTION_BOTTOM)
+	{
+		newHead = {X: oldHead.X, Y:oldHead.Y+1};
+	}
+
+	if(gDirection == DIRECTION_LEFT)
+	{
+		newHead = {X: oldHead.X-1, Y:oldHead.Y};
+	}
+
+	if(gDirection == DIRECTION_RIGHT)
+	{
+		newHead = {X: oldHead.X+1, Y:oldHead.Y};
+	}
+
+	let collided = false;
+
+	if(newHead.X < 0 || newHead.X >= COLS || newHead.Y < 0 || newHead.Y >= ROWS)
+	{
+		collided = true;
+	}else{
+		gBody.forEach(function(s){
+			if(s.X == newHead.X && s.Y == newHead.Y)
+			{
+				collided = true;
+			}
+		});
+	}
+
+	if(collided)
+	{
+		endGame();
+		return;
+	}
+	else if(!(gFoodPos.X == newHead.X && gFoodPos.Y == newHead.Y))
+	{
+		gBody.shift();
+	}
+	else
+	{
+		gFoodPos = generateFoodPos();
+		gScore += 1;
+		gHighScore = Math.max(gHighScore, gScore);
+		gSpeed = Math.max(gSpeed-1, 50);
+	}
+
+	gBody.push(newHead);
+
+	render();
+
+	if(gState == STATE_PLAYING)
+	{
+		setTimeout(move, gSpeed);
+	}		
+}
+
+function generateFoodPos()
+{
+	let foodPos = {X: randX(), Y:randY()};
+	
+	for(let i=0; i<gBody.length; i++)
+	{
+		if(foodPos.X == gBody[i].X && foodPos.Y == gBody[i].Y)
+			return generateFoodPos();
+	}
+	
+	return foodPos;
+}
+
+function randY()
+{
+	return Math.floor(Math.random() * ROWS);
+}
+
+function randX()
+{
+	return Math.floor(Math.random() * COLS);
+}
+
+function changeDirection(newDirection)
+{
+	if(newDirection == gDirection || Math.abs(newDirection - gDirection) == 2)
+		return;
+	
+	gNextDirection = newDirection;
+}
+</script>
+<style>
+	*{
+		padding:0;
+		margin:0;
+	}
+	
+	div
+	{
+		box-sizing: border-box;
+	}
+	
+	body
+	{
+		background-image: url("grass.png");
+		background: #6ea52b;
+		font-family: Tahoma;
+	}
+	.playground
+	{
+		box-sizing:content-box;
+		position:relative;
+		margin-left:auto;
+		margin-right:auto;
+		width:600px;
+		height:600px;
+		border:20px solid #9d7942;
+		background: #ae8a53;
+	}
+	
+	.header
+	{
+		box-sizing:content-box;
+		position:relative;
+		margin-top:50px;
+		margin-left:auto;
+		margin-right:auto;
+		width:600px;
+		height:600px;
+		font-size:28px;
+		line-height:50px;
+		height:50px;
+	}
+	
+	.namebox
+	{
+		box-sizing:content-box;
+		position:relative;
+		margin-left:auto;
+		margin-right:auto;
+		width:600px;
+		text-align:center;
+		height:50px;
+		font-size:28px;
+		line-height:50px;
+	}
+
+	#scorebox
+	{
+		position:absolute;
+		width:200px;
+		height:50px;
+		top:0;
+		left:0;
+		text-align:left;
+	}
+
+	#speedbox
+	{
+		position:absolute;
+		width:200px;
+		height:50px;
+		top:0;
+		left:200px;
+		text-align:center;
+	}
+
+	#highscorebox
+	{
+		position:absolute;
+		width:200px;
+		height:50px;
+		top:0;
+		left:400px;
+		text-align:right;
+	}
+	
+	.segment
+	{
+		position:absolute;
+		width:20px;
+		height:20px;
+		border-style: solid;
+	}
+	
+	.cr
+	{
+		border-width: 2px 0px 2px 2px;
+		border-top-left-radius:10px;
+		border-bottom-left-radius:10px;
+	}
+	.cl
+	{
+		border-width: 2px 2px 2px 0px;
+		border-top-right-radius:10px;
+		border-bottom-right-radius:10px;
+	}
+	.ct
+	{
+		border-width: 0px 2px 2px 2px;
+		border-bottom-left-radius:10px;
+		border-bottom-right-radius:10px;
+	}
+	.cb
+	{
+		border-width: 2px 2px 0px 2px;
+		border-top-left-radius:10px;
+		border-top-right-radius:10px;
+	}
+	.ch
+	{
+		border-width: 2px 0px 2px 0px;
+	}
+	.cv
+	{
+		border-width: 0px 2px 0px 2px;
+	}
+	
+	.ht
+	{
+		background-color:blue;
+		border-width: 2px 2px 0px 2px;
+		border-top-left-radius:10px;
+		border-top-right-radius:10px;
+	}
+	.hb
+	{
+		background-color:blue;
+		border-width: 0px 2px 2px 2px;
+		border-bottom-left-radius:10px;
+		border-bottom-right-radius:10px;
+	}
+	.hl
+	{
+		background-color:blue;
+		border-width: 2px 0px 2px 2px;
+		border-top-left-radius:10px;
+		border-bottom-left-radius:10px;
+	}
+	.hr
+	{
+		background-color:blue;
+		border-width: 2px 2px 2px 0px;
+		border-top-right-radius:10px;
+		border-bottom-right-radius:10px;
+	}
+	
+	
+	.ctl
+	{
+		border-width: 0px 2px 2px 0px;
+		border-bottom-right-radius:10px;
+	}
+	.ctr
+	{
+		border-width: 0px 0px 2px 2px;
+		border-bottom-left-radius:10px;
+	}
+	.cbr
+	{
+		border-width: 2px 0px 0px 2px;
+		border-top-left-radius:10px;
+	}
+	.cbl
+	{
+		border-width: 2px 2px 0px 0px;
+		border-top-right-radius:10px;
+	}
+
+	.blue
+	{
+		border-color: #03b5fc;
+		background-color: #82d6f5;
+	}
+	
+	.et
+	{
+		position:relative;
+		width:16px;
+		height:16px;
+	}
+	.er
+	{
+		position:relative;
+		width:16px;
+		height:16px;
+		transform: rotate(90deg);
+	}
+	.el
+	{
+		position:relative;
+		width:16px;
+		height:16px;
+		transform: rotate(-90deg);
+	}
+	.eb
+	{
+		position:relative;
+		width:16px;
+		height:16px;
+		transform: rotate(180deg);
+	}
+	
+	.ewl
+	{
+		position:absolute;
+		background:white;
+		width:3px;
+		height:3px;
+		top:0px;
+		left:4px;
+	}
+
+	.ewr
+	{
+		position:absolute;
+		background:white;
+		width:3px;
+		height:3px;
+		top:0px;
+		right:4px;
+	}
+	
+	.eblk
+	{
+		position:absolute;
+		background:black;
+		width:1px;
+		height:1px;
+		top:0px;
+		left:1px;
+	}
+	
+	#snake-canvas
+	{
+		position:absolute;
+		width:600px;
+		height:600px;
+	}
+
+	#food
+	{
+		position:absolute;
+		width:20px;
+		height:20px;
+		background:red;
+		border:2px solid #aa0000;
+		border-radius:10px;
+	}
+</style>
+</head>
+<body onload="main()">
+<div class="header">
+	<div id="scorebox"></div>
+	<div id="speedbox"></div>
+	<div id="highscorebox"></div>
+</div>
+<div class="playground">
+	<div class="area" id="area-a">
+	</div>
+	<div class="area" id="area-b">
+	</div>
+	<div class="area" id="area-c">
+	</div>
+	<div id="snake-canvas">
+	
+	</div>
+	<div id="food">
+		
+	</div>
+</div>
+<div class="namebox"><b>SPACE</b> to Start/Pause/Reset</div>
+</body>
+</html>
